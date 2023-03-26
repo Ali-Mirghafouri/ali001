@@ -229,9 +229,45 @@ interface DepartmentType {
 
 app.post("/departments", (req: Request, res: Response) => {
   db.query(`SELECT * FROM Department`, (err: any, data: DepartmentType[]) => {
+    if (err) {
+      response = JSON.stringify({ error: err });
+      res.status(400).send(response);
+      return;
+    }
     response = JSON.stringify({ data: data });
     res.status(200).send(response);
   });
+});
+
+interface GetEmployeesType {
+  supervisorID: number;
+}
+
+app.post("/getFWA", (req: Request, res: Response) => {
+  const body: GetEmployeesType = req.body;
+  if (Object.keys(body).length < 1) {
+    response = JSON.stringify({ error: "missing parameters" });
+    res.status(400).send(response);
+    return;
+  } else {
+    if (!body.supervisorID) {
+      response = JSON.stringify({ error: "missing supervisorID" });
+      res.status(400).send(response);
+      return;
+    }
+  }
+  db.query(
+    `SELECT * FROM FWARequest WHERE supervisorID = '${body.supervisorID}' AND status = 'pending'`,
+    (err, data) => {
+      if (err) {
+        response = JSON.stringify({ error: err });
+        res.status(400).send(response);
+        return;
+      }
+      response = JSON.stringify({ data: data });
+      res.status(200).send(response);
+    }
+  );
 });
 
 interface RequestFWABody {
