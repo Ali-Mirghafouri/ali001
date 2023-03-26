@@ -239,12 +239,13 @@ app.post("/departments", (req: Request, res: Response) => {
   });
 });
 
-interface GetEmployeesType {
+interface GetFWAType {
   supervisorID: number;
+  showHistory?: boolean;
 }
 
 app.post("/getFWA", (req: Request, res: Response) => {
-  const body: GetEmployeesType = req.body;
+  const body: GetFWAType = req.body;
   if (Object.keys(body).length < 1) {
     response = JSON.stringify({ error: "missing parameters" });
     res.status(400).send(response);
@@ -256,8 +257,9 @@ app.post("/getFWA", (req: Request, res: Response) => {
       return;
     }
   }
+  const history = body.showHistory ? "" : " AND status = 'pending'";
   db.query(
-    `SELECT * FROM FWARequest WHERE supervisorID = '${body.supervisorID}' AND status = 'pending'`,
+    `SELECT * FROM FWARequest WHERE supervisorID = '${body.supervisorID}' ${history}`,
     (err, data) => {
       if (err) {
         response = JSON.stringify({ error: err });
@@ -265,6 +267,62 @@ app.post("/getFWA", (req: Request, res: Response) => {
         return;
       }
       response = JSON.stringify({ data: data });
+      res.status(200).send(response);
+    }
+  );
+});
+
+interface UpdateFWAType {
+  requestID: number;
+  status: string;
+  comment?: string;
+}
+app.post("/updateFWA", (req: Request, res: Response) => {
+  const body: UpdateFWAType = req.body;
+  if (Object.keys(body).length < 2) {
+    response = JSON.stringify({ error: "missing parameters" });
+    res.status(400).send(response);
+    return;
+  } else {
+    if (!body.requestID) {
+      response = JSON.stringify({ error: "missing requestID" });
+      res.status(400).send(response);
+      return;
+    }
+    if (!body.status) {
+      response = JSON.stringify({ error: "missing status" });
+      res.status(400).send(response);
+      return;
+    }
+  }
+  if (!(body.status === "Approved" || body.status === "Rejected")) {
+    response = JSON.stringify({
+      error: "status should be Approved or Rejected",
+    });
+    res.status(400).send(response);
+    return;
+  }
+  let comment = body.comment ? `${body.comment}` : "";
+  comment = comment.split("'").join("");
+  console.log("comment>>", comment);
+
+  db.query(
+    `UPDATE FWARequest, Employee SET FWARequest.status = '${body.status}', comment = '
+    ${comment}', Employee.FWAStatus =  CASE WHEN '${body.status}' = 'Approved' THEN FWARequest.workType ELSE 'None' END
+    WHERE FWARequest.employeeID = Employee.employeeID AND requestID = ${body.requestID}`,
+    (err, data: any) => {
+      if (err) {
+        response = JSON.stringify({ error: err });
+        res.status(400).send(response);
+        return;
+      }
+      if (data.affectedRows === 0) {
+        response = JSON.stringify({ data: "Noting updated" });
+        res.status(200).send(response);
+        return;
+      }
+
+      response = JSON.stringify({ data: "FWA updated successfully" });
       res.status(200).send(response);
     }
   );
