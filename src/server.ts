@@ -404,6 +404,38 @@ app.post("/requestFWA", (req: Request, res: Response) => {
   );
 });
 
+interface GetDailyType {
+  employeeID: number;
+}
+
+app.post("/getDaily", (req: Request, res: Response) => {
+  const body: GetDailyType = req.body;
+  if (Object.keys(body).length < 1) {
+    response = JSON.stringify({ error: "missing parameters" });
+    res.status(400).send(response);
+    return;
+  } else {
+    if (!body.employeeID) {
+      response = JSON.stringify({ error: "missing employeeID" });
+      res.status(400).send(response);
+      return;
+    }
+  }
+
+  db.query(
+    `SELECT * FROM DailyScedule WHERE employeeID = '${body.employeeID}'`,
+    (err, data) => {
+      if (err) {
+        response = JSON.stringify({ error: err });
+        res.status(400).send(response);
+        return;
+      }
+      response = JSON.stringify({ data: data });
+      res.status(200).send(response);
+    }
+  );
+});
+
 app.get("/", (req: Request, res: Response) => {
   response = JSON.stringify({ data: "home" });
   res.status(200).send(response);
