@@ -81,7 +81,7 @@ app.post("/login", (req: Request, res: Response) => {
 });
 
 interface ChangePasswordType {
-  employeeID: number;
+  employeeEmail: string;
   oldPassword: string;
   newPassword: string;
 }
@@ -93,8 +93,8 @@ app.post("/changePassword", (req: Request, res: Response) => {
     res.status(400).send(response);
     return;
   } else {
-    if (!body.employeeID) {
-      response = JSON.stringify({ error: "missing employeeID" });
+    if (!body.employeeEmail) {
+      response = JSON.stringify({ error: "missing employeeEmail" });
       res.status(400).send(response);
       return;
     }
@@ -109,8 +109,9 @@ app.post("/changePassword", (req: Request, res: Response) => {
       return;
     }
   }
+  const email = body.employeeEmail.toLowerCase();
   db.query(
-    `SELECT * FROM Employee WHERE employeeID = '${body.employeeID}' AND password = '${body.oldPassword}'`,
+    `SELECT * FROM Employee WHERE email = '${email}' AND password = '${body.oldPassword}'`,
     (err: any, data: UsersType[]) => {
       if (err) {
         response = JSON.stringify({ error: err });
@@ -125,7 +126,7 @@ app.post("/changePassword", (req: Request, res: Response) => {
         return;
       }
       db.query(
-        `UPDATE Employee SET password = '${body.newPassword}', status = 'None' WHERE employeeID = '${body.employeeID}'`,
+        `UPDATE Employee SET password = '${body.newPassword}', status = 'None' WHERE email = '${body.employeeEmail}'`,
         (err, data) => {
           if (err) {
             response = JSON.stringify({ error: err });
