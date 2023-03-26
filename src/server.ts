@@ -272,6 +272,19 @@ app.post("/getFWA", (req: Request, res: Response) => {
   );
 });
 
+app.post("/getAllFWA", (req: Request, res: Response) => {
+  const body: GetFWAType = req.body;
+  db.query(`SELECT * FROM FWARequest`, (err, data) => {
+    if (err) {
+      response = JSON.stringify({ error: err });
+      res.status(400).send(response);
+      return;
+    }
+    response = JSON.stringify({ data: data });
+    res.status(200).send(response);
+  });
+});
+
 interface UpdateFWAType {
   requestID: number;
   status: string;
