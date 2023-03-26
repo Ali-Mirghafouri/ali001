@@ -436,6 +436,40 @@ app.post("/getDaily", (req: Request, res: Response) => {
   );
 });
 
+interface GetEmployeesDailyType {
+  supervisorID: number;
+}
+
+app.post("/getEmployeesDaily", (req: Request, res: Response) => {
+  const body: GetEmployeesDailyType = req.body;
+  if (Object.keys(body).length < 1) {
+    response = JSON.stringify({ error: "missing parameters" });
+    res.status(400).send(response);
+    return;
+  } else {
+    if (!body.supervisorID) {
+      response = JSON.stringify({ error: "missing supervisorID" });
+      res.status(400).send(response);
+      return;
+    }
+    db.query(
+      `SELECT * FROM DailyScedule AS d 
+    LEFT JOIN EmployeeSuperVisor AS e ON e.employeeID = d.employeeID
+    WHERE e.supervisorID = '${body.supervisorID}'`,
+      (err, data) => {
+        console.log(data);
+        if (err) {
+          response = JSON.stringify({ error: err });
+          res.status(400).send(response);
+          return;
+        }
+        response = JSON.stringify({ data: data });
+        res.status(200).send(response);
+      }
+    );
+  }
+});
+
 app.get("/", (req: Request, res: Response) => {
   response = JSON.stringify({ data: "home" });
   res.status(200).send(response);
@@ -447,7 +481,7 @@ interface AddDailyType {
   workLocation: string;
   workHours: string;
   workReport: string;
-  dailyID?: string;
+  dailyID?: number;
 }
 
 app.post("/addDaily", (req: Request, res: Response) => {
@@ -505,6 +539,46 @@ app.post("/addDaily", (req: Request, res: Response) => {
       return;
     }
     response = JSON.stringify({ data: "Daily Schedule updated successfully" });
+    res.status(200).send(response);
+  });
+});
+
+interface CommentDailyType {
+  dailyID: number;
+  comment: string;
+}
+
+app.post("/commentDaily", (req: Request, res: Response) => {
+  const body: CommentDailyType = req.body;
+  if (Object.keys(body).length < 2) {
+    response = JSON.stringify({ error: "missing parameters" });
+    res.status(400).send(response);
+    return;
+  } else {
+    if (!body.dailyID) {
+      response = JSON.stringify({ error: "missing dailyID" });
+      res.status(400).send(response);
+      return;
+    }
+    if (!body.comment) {
+      response = JSON.stringify({ error: "missing comment" });
+      res.status(400).send(response);
+      return;
+    }
+  }
+
+  const comment = body.comment.split("'").join("");
+  const query = `UPDATE DailyScedule SET supervisorComments = '${comment}' 
+      WHERE dailyID = '${body.dailyID}'`;
+  db.query(query, (err, data) => {
+    if (err) {
+      response = JSON.stringify({ error: err });
+      res.status(400).send(response);
+      return;
+    }
+    response = JSON.stringify({
+      data: "Daily Schedule commented successfully",
+    });
     res.status(200).send(response);
   });
 });
