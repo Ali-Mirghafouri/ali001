@@ -304,7 +304,7 @@ app.post("/updateFWA", (req: Request, res: Response) => {
   }
   let comment = body.comment ? `${body.comment}` : "";
   comment = comment.split("'").join("");
-  console.log("comment>>", comment);
+  // console.log("comment>>", comment);
 
   db.query(
     `UPDATE FWARequest, Employee SET FWARequest.status = '${body.status}', comment = '
@@ -439,6 +439,74 @@ app.post("/getDaily", (req: Request, res: Response) => {
 app.get("/", (req: Request, res: Response) => {
   response = JSON.stringify({ data: "home" });
   res.status(200).send(response);
+});
+
+interface AddDailyType {
+  employeeID: number;
+  date: Date;
+  workLocation: string;
+  workHours: string;
+  workReport: string;
+  dailyID?: string;
+}
+
+app.post("/addDaily", (req: Request, res: Response) => {
+  const body: AddDailyType = req.body;
+  let query = "";
+  let dailyID = "";
+
+  if (Object.keys(body).length < 5) {
+    response = JSON.stringify({ error: "missing parameters" });
+    res.status(400).send(response);
+    return;
+  } else {
+    if (!body.employeeID) {
+      response = JSON.stringify({ error: "missing employeeID" });
+      res.status(400).send(response);
+      return;
+    }
+    if (!body.date) {
+      response = JSON.stringify({ error: "missing date" });
+      res.status(400).send(response);
+      return;
+    }
+    if (!body.workLocation) {
+      response = JSON.stringify({ error: "missing workLocation" });
+      res.status(400).send(response);
+      return;
+    }
+    if (!body.workHours) {
+      response = JSON.stringify({ error: "missing workHours" });
+      res.status(400).send(response);
+      return;
+    }
+    if (!body.workReport) {
+      response = JSON.stringify({ error: "missing workReport" });
+      res.status(400).send(response);
+      return;
+    }
+    dailyID = body.dailyID ? `${body.dailyID}` : "";
+  }
+
+  const date = new Date(body.date).toISOString().slice(0, 19).replace("T", " ");
+  let report = body.workReport ? `${body.workReport}` : "";
+  report = report.split("'").join("");
+  query =
+    dailyID === ""
+      ? `INSERT INTO DailyScedule (employeeID, date, workLocation, workHours, workReport) 
+  VALUES('${body.employeeID}', '${date}', '${body.workLocation}', '${body.workHours}', '${report}')`
+      : `UPDATE DailyScedule SET employeeID = '${body.employeeID}', date =  '${date}', 
+      workLocation = '${body.workLocation}', workHours = '${body.workHours}', workReport = '${report}' 
+      WHERE dailyID = '${dailyID}'`;
+  db.query(query, (err, data) => {
+    if (err) {
+      response = JSON.stringify({ error: err });
+      res.status(400).send(response);
+      return;
+    }
+    response = JSON.stringify({ data: "Daily Schedule updated successfully" });
+    res.status(200).send(response);
+  });
 });
 
 app.listen(3000, () => {
