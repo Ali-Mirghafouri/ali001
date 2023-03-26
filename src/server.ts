@@ -2,7 +2,15 @@ import express from "express";
 import { Request, Response } from "express";
 import mysql from "mysql2";
 
+import cors from "cors";
+
 const app = express();
+
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 
 app.use(express.json());
 
