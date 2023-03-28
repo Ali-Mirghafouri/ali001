@@ -118,6 +118,7 @@ app.post("/changePassword", (req: Request, res: Response) => {
     }
   }
   const email = body.employeeEmail.toLowerCase();
+  console.log(body);
   db.query(
     `SELECT * FROM Employee WHERE email = '${email}' AND password = '${body.oldPassword}'`,
     (err: any, data: UsersType[]) => {
@@ -127,6 +128,8 @@ app.post("/changePassword", (req: Request, res: Response) => {
         return;
       }
       if (data.length !== 1) {
+        console.log("data");
+        console.log(data);
         response = JSON.stringify({
           error: "email and password didn't match",
         });
@@ -150,22 +153,27 @@ app.post("/changePassword", (req: Request, res: Response) => {
 });
 
 interface RegisterBody {
+  employeeID: number;
   email: string;
   supervisorID: string;
   name: string;
   position: string;
-  departmentID: string;
-  role?: string;
+  departmentID: number;
 }
 
 app.post("/register", (req: Request, res: Response) => {
   // console.log(">>>>", req.body);
   const body: RegisterBody = req.body;
-  if (Object.keys(body).length < 4) {
+  if (Object.keys(body).length < 5) {
     response = JSON.stringify({ error: "missing parameters" });
     res.status(400).send(response);
     return;
   } else {
+    if (!body.employeeID) {
+      response = JSON.stringify({ error: "missing employeeID" });
+      res.status(400).send(response);
+      return;
+    }
     if (!body.email) {
       response = JSON.stringify({ error: "missing email" });
       res.status(400).send(response);
@@ -191,40 +199,31 @@ app.post("/register", (req: Request, res: Response) => {
   const password = 10000000 + Math.floor(Math.random() * 10000000);
 
   let supervisorID = parseInt(body.supervisorID);
-  const role = body.role ?? "employee";
 
   if (supervisorID < 1 || isNaN(supervisorID)) {
     supervisorID = 0; // no supervisor
   }
-
   db.query(
-    `INSERT INTO Employee (email, password, name, position, FWAStatus, role, status) 
-    VALUES ('${email}' , '${password}' , '${body.name}', '${body.position}', 'None', '${role}', 'New') `,
+    `INSERT INTO Employee (employeeID ,email, password, name, position, FWAStatus, role, status, departmentID) 
+    VALUES ('${body.employeeID}' , '${email}' , '${password}' , '${body.name}', '${body.position}', 'New', 'employee', 'New', '${body.departmentID}') `,
     (err: any, data: any) => {
       if (err) {
         response = JSON.stringify({ error: err });
         res.status(400).send(response);
         return;
       }
-      // console.log("OK>>", data);
+      if (supervisorID > 0) {
+        db.query(
+          `INSERT INTO EmployeeSuperVisor (supervisorID, employeeID) 
+        VALUES ('${supervisorID}' , '${body.employeeID}')`
+        );
+      }
       db.query(
-        `SELECT employeeID FROM Employee WHERE email = '${email}'`,
-        (err: any, data: { employeeID: number }[]) => {
-          // console.log("ID>>>>", err, data);
-          if (supervisorID > 0) {
-            db.query(
-              `INSERT INTO EmployeeSuperVisor (supervisorID, employeeID) 
-            VALUES ('${supervisorID}' , '${data[0].employeeID}')`
-            );
-          }
-          db.query(
-            `INSERT INTO DepartmentEmployee (EmployeeID, DepartmentID) 
-            VALUES ('${data[0].employeeID}', '${body.departmentID}')`
-          );
-          response = JSON.stringify({ data: { password: password } });
-          res.status(200).send(response);
-        }
+        `INSERT INTO DepartmentEmployee (EmployeeID, DepartmentID) 
+        VALUES ('${body.employeeID}', '${body.departmentID}')`
       );
+      response = JSON.stringify({ data: { password: password } });
+      res.status(200).send(response);
       return;
     }
   );
@@ -354,6 +353,7 @@ interface RequestFWABody {
   workType: string;
   description: string;
   reason: string;
+  departmentID: string;
 }
 
 interface FWAEmployeeSuperVisorType {
@@ -409,8 +409,8 @@ app.post("/requestFWA", (req: Request, res: Response) => {
       body.description = body.description.replace("'", "");
       body.reason = body.reason.replace("'", "");
       db.query(
-        `INSERT FWARequest (employeeID, requestDate, workType, description, reason, status, comment, supervisorID) 
-        VALUES('${body.employeeID}', '${date}', '${body.workType}', '${body.description}', '${body.reason}', 'Pending', '', '${supervisorID}')`,
+        `INSERT FWARequest (employeeID, requestDate, workType, description, reason, status, comment, supervisorID, departmentID) 
+        VALUES('${body.employeeID}', '${date}', '${body.workType}', '${body.description}', '${body.reason}', 'Pending', '', '${supervisorID}' , '${body.departmentID}')`,
         (err, data) => {
           if (err) {
             response = JSON.stringify({ error: err });
@@ -445,6 +445,148 @@ app.post("/getDaily", (req: Request, res: Response) => {
 
   db.query(
     `SELECT * FROM DailyScedule WHERE employeeID = '${body.employeeID}'`,
+    (err, data) => {
+      if (err) {
+        response = JSON.stringify({ error: err });
+        res.status(400).send(response);
+        return;
+      }
+      response = JSON.stringify({ data: data });
+      res.status(200).send(response);
+    }
+  );
+});
+
+interface GetDailyDateType {
+  departmentID: number;
+  date: string;
+}
+
+app.post("/getDailyDate", (req: Request, res: Response) => {
+  const body: GetDailyDateType = req.body;
+  if (Object.keys(body).length < 1) {
+    response = JSON.stringify({ error: "missing parameters" });
+    res.status(400).send(response);
+    return;
+  } else {
+    if (!body.departmentID) {
+      response = JSON.stringify({ error: "missing departmentID" });
+      res.status(400).send(response);
+      return;
+    }
+    if (!body.date) {
+      response = JSON.stringify({ error: "missing date" });
+      res.status(400).send(response);
+      return;
+    }
+  }
+
+  db.query(
+    `SELECT * FROM DailyScedule WHERE departmentID = '${body.departmentID}' AND date = '${body.date}'`,
+    (err, data) => {
+      if (err) {
+        response = JSON.stringify({ error: err });
+        res.status(400).send(response);
+        return;
+      }
+      response = JSON.stringify({ data: data });
+      res.status(200).send(response);
+    }
+  );
+});
+
+interface GetFwaByDateDepartment {
+  date: string;
+  departmentID: number;
+}
+
+app.post("/GetFwaByDateDepartment", (req: Request, res: Response) => {
+  const body: GetFwaByDateDepartment = req.body;
+  if (Object.keys(body).length < 2) {
+    response = JSON.stringify({ error: "missing parameters" });
+    res.status(400).send(response);
+    return;
+  } else {
+    if (!body.date) {
+      response = JSON.stringify({ error: "missing date" });
+      res.status(400).send(response);
+      return;
+    }
+    if (!body.departmentID) {
+      response = JSON.stringify({ error: "missing departmentID" });
+      res.status(400).send(response);
+      return;
+    }
+  }
+
+  db.query(
+    `SELECT * FROM fwarequest WHERE requestDate = '${body.date}' AND departmentID = '${body.departmentID}'`,
+    (err, data) => {
+      if (err) {
+        response = JSON.stringify({ error: err });
+        res.status(400).send(response);
+        return;
+      }
+      response = JSON.stringify({ data: data });
+      res.status(200).send(response);
+    }
+  );
+});
+
+interface GetFwaByDepartment {
+  departmentID: number;
+}
+
+app.post("/GetFwaByDepartment", (req: Request, res: Response) => {
+  const body: GetFwaByDateDepartment = req.body;
+  console.log(body);
+  if (Object.keys(body).length < 1) {
+    response = JSON.stringify({ error: "missing parameters" });
+    res.status(400).send(response);
+    return;
+  } else {
+    if (!body.departmentID) {
+      response = JSON.stringify({ error: "missing departmentID" });
+      res.status(400).send(response);
+      return;
+    }
+  }
+
+  db.query(
+    `SELECT * FROM fwarequest WHERE departmentID = '${body.departmentID}'`,
+    (err, data) => {
+      if (err) {
+        response = JSON.stringify({ error: err });
+        res.status(400).send(response);
+        return;
+      }
+      response = JSON.stringify({ data: data });
+      res.status(200).send(response);
+    }
+  );
+});
+
+interface GetDepartmentByDepartmentID {
+  departmentID: number;
+}
+
+app.post("/GetDepartmentByDepartmentID", (req: Request, res: Response) => {
+  const body: GetFwaByDateDepartment = req.body;
+  console.log(body);
+  if (Object.keys(body).length < 1) {
+    response = JSON.stringify({ error: "missing parameters" });
+    res.status(400).send(response);
+    return;
+  } else {
+    if (!body.departmentID) {
+      response = JSON.stringify({ error: "missing departmentID" });
+      res.status(400).send(response);
+      return;
+    }
+  }
+
+  db.query(
+    `SELECT * FROM department WHERE deptID = '${body.departmentID}'`,
     (err, data) => {
       if (err) {
         response = JSON.stringify({ error: err });
@@ -503,6 +645,7 @@ interface AddDailyType {
   workHours: string;
   workReport: string;
   dailyID?: number;
+  departmentID: number;
 }
 
 app.post("/addDaily", (req: Request, res: Response) => {
@@ -510,7 +653,7 @@ app.post("/addDaily", (req: Request, res: Response) => {
   let query = "";
   let dailyID = "";
 
-  if (Object.keys(body).length < 5) {
+  if (Object.keys(body).length < 6) {
     response = JSON.stringify({ error: "missing parameters" });
     res.status(400).send(response);
     return;
@@ -540,6 +683,11 @@ app.post("/addDaily", (req: Request, res: Response) => {
       res.status(400).send(response);
       return;
     }
+    if (!body.departmentID) {
+      response = JSON.stringify({ error: "missing departmentID" });
+      res.status(400).send(response);
+      return;
+    }
     dailyID = body.dailyID ? `${body.dailyID}` : "";
   }
 
@@ -548,8 +696,8 @@ app.post("/addDaily", (req: Request, res: Response) => {
   report = report.split("'").join("");
   query =
     dailyID === ""
-      ? `INSERT INTO DailyScedule (employeeID, date, workLocation, workHours, workReport) 
-  VALUES('${body.employeeID}', '${date}', '${body.workLocation}', '${body.workHours}', '${report}')`
+      ? `INSERT INTO DailyScedule (employeeID, date, workLocation, workHours, workReport,departmentID) 
+  VALUES('${body.employeeID}', '${date}', '${body.workLocation}', '${body.workHours}', '${report}' , '${body.departmentID}')`
       : `UPDATE DailyScedule SET employeeID = '${body.employeeID}', date =  '${date}', 
       workLocation = '${body.workLocation}', workHours = '${body.workHours}', workReport = '${report}' 
       WHERE dailyID = '${dailyID}'`;
@@ -600,6 +748,32 @@ app.post("/commentDaily", (req: Request, res: Response) => {
     response = JSON.stringify({
       data: "Daily Schedule commented successfully",
     });
+    res.status(200).send(response);
+  });
+});
+
+app.post("/getDepartmentEmployee", (req: Request, res: Response) => {
+  let response: any = [];
+  const query1 = `SELECT COUNT(DepartmentID) as count FROM departmentemployee WHERE DepartmentID = '1'`;
+  const query2 = `SELECT COUNT(DepartmentID) as count FROM departmentemployee WHERE DepartmentID = '2'`;
+  const query3 = `SELECT COUNT(DepartmentID) as count FROM departmentemployee WHERE DepartmentID = '3'`;
+  const query4 = `SELECT COUNT(DepartmentID) as count FROM departmentemployee WHERE DepartmentID = '4'`;
+  db.query(query1, (err, data: any) => {
+    console.log(data);
+    response = [...response, { department: data[0].count }];
+  });
+  db.query(query2, (err, data: any) => {
+    console.log(data);
+    response = [...response, { department: data[0].count }];
+  });
+  db.query(query3, (err, data: any) => {
+    console.log(data);
+    response = [...response, { department: data[0].count }];
+  });
+  db.query(query4, (err, data: any) => {
+    console.log(data);
+    response = [...response, { department: data[0].count }];
+    console.log(response);
     res.status(200).send(response);
   });
 });
